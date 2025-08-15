@@ -135,7 +135,7 @@ def initialize_retriever():
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
 
     # ベクターストアを検索するRetrieverの作成
-    # マジックナンバー:5 → ct.RETRIEVER_K
+    # マジックナンバーで「5」となっていたものを変数「ct.RETRIEVER_K」に置き換え
     st.session_state.retriever = db.as_retriever(search_kwargs={"k": ct.RETRIEVER_K})
 
 

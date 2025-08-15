@@ -13,6 +13,8 @@ import constants as ct
 ############################################################
 # 関数定義
 ############################################################
+# 注意：この位置でカラムを定義（グローバルスコープという）するとエラーの原因となる
+# そのため、必要なら各関数内で定義すること。今回は必要ない
 
 def display_app_title():
     """
@@ -25,15 +27,26 @@ def display_select_mode():
     """
     回答モードのラジオボタンを表示
     """
-    # 回答モードを選択する用のラジオボタンを表示
     col1, col2 = st.columns([100, 1])
     with col1:
+        st.sidebar.markdown(f"## 利用目的")
         # 「label_visibility="collapsed"」とすることで、ラジオボタンのラベルを非表示にする
-        st.session_state.mode = st.radio(
-            label="",
+        st.session_state.mode = st.sidebar.radio(
+            label="", # ← 注意：labelには純粋な文字列を渡す必要があるのでst.markdown()は不可
             options=[ct.ANSWER_MODE_1, ct.ANSWER_MODE_2],
             label_visibility="collapsed"
-        )
+            )
+        st.sidebar.divider()
+        """        
+        st.markdown(f"### 利用目的")
+        # 「label_visibility="collapsed"」とすることで、ラジオボタンのラベルを非表示にする
+        st.session_state.mode = st.radio(
+            label="", # ← 注意：labelには純粋な文字列を渡す必要があるのでst.markdown()は不可
+            options=[ct.ANSWER_MODE_1, ct.ANSWER_MODE_2],
+            label_visibility="collapsed"
+            )
+        st.divider()
+        """
 
 
 def display_initial_ai_message():
@@ -42,26 +55,31 @@ def display_initial_ai_message():
     """
     with st.chat_message("assistant"):
         # 「st.success()」とすると緑枠で表示される
-        st.markdown("こんにちは。私は社内文書の情報をもとに回答する生成AIチャットボットです。上記で利用目的を選択し、画面下部のチャット欄からメッセージを送信してください。")
+        # st.markdown() →st.success()
+        st.success("こんにちは。私は社内文書の情報をもとに回答する生成AIチャットボットです。上記で利用目的を選択し、画面下部のチャット欄からメッセージを送信してください。")
+        st.warning("具体的に入力したほうが期待通りの回答を得やすいです。", icon=ct.WARNING_ICON )
 
-        # 「社内文書検索」の機能説明
-        st.markdown("**【「社内文書検索」を選択した場合】**")
-        # 「st.info()」を使うと青枠で表示される
-        st.info("入力内容と関連性が高い社内文書のありかを検索できます。")
-        # 「st.code()」を使うとコードブロックの装飾で表示される
-        # 「wrap_lines=True」で折り返し設定、「language=None」で非装飾とする
-        st.code("【入力例】\n社員の育成方針に関するMTGの議事録", wrap_lines=True, language=None)
+    """
+    各機能の説明
+    """
+    # 「社内文書検索」の機能説明
+    st.sidebar.markdown("**【「社内文書検索」を選択した場合】**")
+    # 「st.info()」を使うと青枠で表示される
+    st.sidebar.info("入力内容と関連性が高い社内文書のありかを検索できます。")
+    # 「st.code()」を使うとコードブロックの装飾で表示される
+    # 「wrap_lines=True」で折り返し設定、「language=None」で非装飾とする
+    st.sidebar.code("【入力例】\n社員の育成方針に関するMTGの議事録", wrap_lines=True, language=None)
 
-        # 「社内問い合わせ」の機能説明
-        st.markdown("**【「社内問い合わせ」を選択した場合】**")
-        st.info("質問・要望に対して、社内文書の情報をもとに回答を得られます。")
-        st.code("【入力例】\n人事部に所属している従業員情報を一覧化して", wrap_lines=True, language=None)
+    # 「社内問い合わせ」の機能説明
+    st.sidebar.markdown("**【「社内問い合わせ」を選択した場合】**")
+    st.sidebar.info("質問・要望に対して、社内文書の情報をもとに回答を得られます。")
+    st.sidebar.code("【入力例】\n人事部に所属している従業員情報を一覧化して", wrap_lines=True, language=None)
 
 
 def display_conversation_log():
     """
     会話ログの一覧表示
-    """
+    """      
     # 会話ログのループ処理
     for message in st.session_state.messages:
         # 「message」辞書の中の「role」キーには「user」か「assistant」が入っている
@@ -112,6 +130,7 @@ def display_conversation_log():
                                     st.info(f"{sub_choice['source']}", icon=icon)
                     # ファイルのありかの情報が取得できなかった場合、LLMからの回答のみ表示
                     else:
+                        st.markdown(f"【「{message['content']['mode']}」モードでの回答】")
                         st.markdown(message["content"]["answer"])
                 
                 # 「社内問い合わせ」の場合の表示処理
