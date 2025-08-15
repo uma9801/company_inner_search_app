@@ -47,10 +47,14 @@ TEMPERATURE = 0.5
 # RAG参照用のデータソース系
 # ==========================================
 RAG_TOP_FOLDER_PATH = "./data"
+# .txtファイルの読み込みも追加
 SUPPORTED_EXTENSIONS = {
     ".pdf": PyMuPDFLoader,
     ".docx": Docx2txtLoader,
-    ".csv": lambda path: CSVLoader(path, encoding="utf-8")
+    ".csv": lambda path: CSVLoader(path, encoding="utf-8"),
+    # ".txt"ファイルの読み込みを追加。
+    # encodeingを指定しないと、cp932（Shift_JIS系）がデフォルトで設定されてしまいエラーになる。
+    ".txt": lambda path: TextLoader(path, encoding="utf-8"),
 }
 WEB_URL_LOAD_TARGETS = [
     "https://generative-ai.web-camp.io/"
