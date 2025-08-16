@@ -20,6 +20,9 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 import constants as ct
 
+# CSVファイルの読み込みとドキュメント結合のために必要なライブラリ   
+import pandas as pd
+from langchain_core.documents import Document
 
 ############################################################
 # 設定関連
@@ -215,10 +218,22 @@ def file_load(path, docs_all):
 
     # 想定していたファイル形式の場合のみ読み込む
     if file_extension in ct.SUPPORTED_EXTENSIONS:
-        # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
-        loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
-        docs = loader.load()
-        docs_all.extend(docs)
+        # csvファイルは1つのドキュメントにまとめる
+        if file_extension == ".csv":
+            # pandasを使って読み込み
+            df = pd.read_csv(path, encoding="utf-8")
+            # 部署名順でソート
+            df_sorted = df.sort_values("部署")
+            # 各行を文字列に変換し、改行で連結
+            all_content_doc = "\n".join(["".join(map(str, row)) for row in df_sorted.values])
+            # 1つのドキュメントとして追加
+            merged_doc = Document(page_content=all_content_doc, metadata={"source": path})
+            docs_all.append(merged_doc)
+        else:
+            # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
+            loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
+            docs = loader.load()
+            docs_all.extend(docs)
 
 
 def adjust_string(s):
