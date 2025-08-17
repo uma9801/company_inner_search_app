@@ -113,12 +113,12 @@ def get_llm_response(chat_message):
     # LLMレスポンスを会話履歴に追加
     st.session_state.chat_history.extend([HumanMessage(content=chat_message), llm_response["answer"]])
 
-    """
-    検証用：検索で得られた関連ドキュメント数と内容を出力
+    
+    # 検証用：検索で得られた関連ドキュメント数と内容を出力
     retriever_docs = llm_response.get("context", [])
     st.write(f"関連ドキュメント数: {len(retriever_docs)}")
     for i, doc in enumerate(retriever_docs):
         st.write(doc.page_content)
-    """
+    
 
     return llm_response

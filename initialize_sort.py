@@ -21,7 +21,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 import constants as ct
 
-# ドキュメント結合のために必要なライブラリの読み込み  
+# CSVファイルの読み込みとドキュメント結合のために必要なライブラリ   
+import pandas as pd
 from langchain_core.documents import Document
 
 ############################################################
@@ -113,8 +114,7 @@ def initialize_retriever():
         return
     
     # RAGの参照先となるデータソースの読み込み
-    # 1つのドキュメントにまとめたcsvファイルのデータソース読み込みを追加
-    docs_all, csv_doc = load_data_sources()
+    docs_all = load_data_sources()
 
     # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
     for doc in docs_all:
@@ -134,10 +134,6 @@ def initialize_retriever():
 
     # チャンク分割を実施
     splitted_docs = text_splitter.split_documents(docs_all)
-
-    # csv_docが存在する場合、分割後のドキュメントリストに追加
-    if csv_doc:
-        splitted_docs.append(csv_doc)
 
     # ベクターストアの作成
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
@@ -167,12 +163,8 @@ def load_data_sources():
     """
     # データソースを格納する用のリスト
     docs_all = []
-    # csvファイルのデータソースを格納する用の変数
-    # 1つのドキュメントに結合したデータソースを格納するので [None]（要素が1つだけ入るリスト）
-    csv_doc = [None]
     # ファイル読み込みの実行（渡した各リストにデータが格納される）
-    # csv_docを追加
-    recursive_file_check(ct.RAG_TOP_FOLDER_PATH, docs_all, csv_doc)
+    recursive_file_check(ct.RAG_TOP_FOLDER_PATH, docs_all)
 
     web_docs_all = []
     # ファイルとは別に、指定のWebページ内のデータも読み込み
@@ -186,12 +178,10 @@ def load_data_sources():
     # 通常読み込みのデータソースにWebページのデータを追加
     docs_all.extend(web_docs_all)
 
-    # csv_doc[0]を追加
-    return docs_all, csv_doc[0]
+    return docs_all
 
 
-# csv_docを追加
-def recursive_file_check(path, docs_all, csv_doc):
+def recursive_file_check(path, docs_all):
     """
     RAGの参照先となるデータソースの読み込み
 
@@ -208,16 +198,13 @@ def recursive_file_check(path, docs_all, csv_doc):
             # ファイル/フォルダ名だけでなく、フルパスを取得
             full_path = os.path.join(path, file)
             # フルパスを渡し、再帰的にファイル読み込みの関数を実行
-            # csv_docを追加
-            recursive_file_check(full_path, docs_all, csv_doc)
+            recursive_file_check(full_path, docs_all)
     else:
         # パスがファイルの場合、ファイル読み込み
-        # csv_docを追加
-        file_load(path, docs_all, csv_doc)
+        file_load(path, docs_all)
 
 
-# csv_docを追加
-def file_load(path, docs_all, csv_doc):
+def file_load(path, docs_all):
     """
     ファイル内のデータ読み込み
 
@@ -234,15 +221,15 @@ def file_load(path, docs_all, csv_doc):
     if file_extension in ct.SUPPORTED_EXTENSIONS:
         # csvファイルは1つのドキュメントにまとめる
         if file_extension == ".csv":
-            # data loaderを使ってデータ読み込み
-            loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
-            docs = loader.load()
-            # すべてのドキュメントのテキストを改行で連結
-            merged_content = "\n".join([doc.page_content for doc in docs])
-            # 最初のドキュメントのメタデータを流用
-            merged_metadata = docs[0].metadata if docs else {}
-            # 1つのDocumentにまとめる
-            csv_doc[0] = Document(page_content=merged_content, metadata=merged_metadata)
+            # pandasを使って読み込み
+            df = pd.read_csv(path, encoding="utf-8")
+            # 部署名順でソート
+            df_sorted = df.sort_values("部署")
+            # 各行を文字列に変換し、改行で連結
+            all_content_doc = "\n".join(["".join(map(str, row)) for row in df_sorted.values])
+            # 1つのドキュメントとして追加
+            merged_doc = Document(page_content=all_content_doc, metadata={"source": path})
+            docs_all.append(merged_doc)
         else:
             # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
             loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)

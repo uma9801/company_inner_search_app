@@ -21,7 +21,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 import constants as ct
 
-# ドキュメント結合のために必要なライブラリの読み込み  
+# CSVファイルの読み込みとドキュメント結合のために必要なライブラリ   
+import pandas as pd
 from langchain_core.documents import Document
 
 ############################################################
@@ -113,8 +114,7 @@ def initialize_retriever():
         return
     
     # RAGの参照先となるデータソースの読み込み
-    # 1つのドキュメントにまとめたcsvファイルのデータソース読み込みを追加
-    docs_all, csv_doc = load_data_sources()
+    docs_all = load_data_sources()
 
     # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
     for doc in docs_all:
@@ -134,10 +134,6 @@ def initialize_retriever():
 
     # チャンク分割を実施
     splitted_docs = text_splitter.split_documents(docs_all)
-
-    # csv_docが存在する場合、分割後のドキュメントリストに追加
-    if csv_doc:
-        splitted_docs.append(csv_doc)
 
     # ベクターストアの作成
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
@@ -167,12 +163,8 @@ def load_data_sources():
     """
     # データソースを格納する用のリスト
     docs_all = []
-    # csvファイルのデータソースを格納する用の変数
-    # 1つのドキュメントに結合したデータソースを格納するので [None]（要素が1つだけ入るリスト）
-    csv_doc = [None]
     # ファイル読み込みの実行（渡した各リストにデータが格納される）
-    # csv_docを追加
-    recursive_file_check(ct.RAG_TOP_FOLDER_PATH, docs_all, csv_doc)
+    recursive_file_check(ct.RAG_TOP_FOLDER_PATH, docs_all)
 
     web_docs_all = []
     # ファイルとは別に、指定のWebページ内のデータも読み込み
@@ -186,12 +178,10 @@ def load_data_sources():
     # 通常読み込みのデータソースにWebページのデータを追加
     docs_all.extend(web_docs_all)
 
-    # csv_doc[0]を追加
-    return docs_all, csv_doc[0]
+    return docs_all
 
 
-# csv_docを追加
-def recursive_file_check(path, docs_all, csv_doc):
+def recursive_file_check(path, docs_all):
     """
     RAGの参照先となるデータソースの読み込み
 
@@ -208,16 +198,13 @@ def recursive_file_check(path, docs_all, csv_doc):
             # ファイル/フォルダ名だけでなく、フルパスを取得
             full_path = os.path.join(path, file)
             # フルパスを渡し、再帰的にファイル読み込みの関数を実行
-            # csv_docを追加
-            recursive_file_check(full_path, docs_all, csv_doc)
+            recursive_file_check(full_path, docs_all)
     else:
         # パスがファイルの場合、ファイル読み込み
-        # csv_docを追加
-        file_load(path, docs_all, csv_doc)
+        file_load(path, docs_all)
 
 
-# csv_docを追加
-def file_load(path, docs_all, csv_doc):
+def file_load(path, docs_all):
     """
     ファイル内のデータ読み込み
 
@@ -239,10 +226,29 @@ def file_load(path, docs_all, csv_doc):
             docs = loader.load()
             # すべてのドキュメントのテキストを改行で連結
             merged_content = "\n".join([doc.page_content for doc in docs])
+            # 問題解決できなかった：検索され易い文字に変換、文字数を減らしてソースに含まれる情報を増やす
+            merged_content = (
+                merged_content
+                .replace("部署", "所属")
+                .replace("（フルネーム）", "")
+                .replace("メールアドレス", "e-mail")
+                )
+            
+            """
+            # 問題解決できなかった：無くしても影響の少ない文字を削除し、ソースに含まれる情報を増やす
+            delete_words = [
+                "氏名（フルネーム）:", "性別:", "メールアドレス:",
+                "従業員区分:", "役職:", "大学名:", "学部・学科:"
+            ]
+            for word in delete_words:
+                merged_content = merged_content.replace(word, "")
+            """
+
             # 最初のドキュメントのメタデータを流用
             merged_metadata = docs[0].metadata if docs else {}
             # 1つのDocumentにまとめる
-            csv_doc[0] = Document(page_content=merged_content, metadata=merged_metadata)
+            merged_doc = Document(page_content=merged_content, metadata=merged_metadata)
+            docs_all.append(merged_doc)
         else:
             # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
             loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
